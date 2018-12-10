@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: threshold
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: threshold
+  template:
+    metadata:
+      labels:
+        name: threshold
+    spec:
+      containers:
+        - name: threshold
+          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v7 
+          env:
+          - name: REDIS_IP
+            value: "192.168.195.1"
+          - name: REDIS_PORT
+            value: "30088"
+          - name: KAFKA_IP
+            value: "192.168.195.1"
+          - name: KAFKA_PORT
+            value: "32400"   
+          - name: HBASE_IP
+            value: "192.168.195.1"
+          - name: HBASE_PORT
+            value: "9090" 
+          - name: CONSUMER_TOPIC
+            value: "k8s_MonitorData" 
+          - name: PRODUCER_TOPIC
+            value: "ai_threshold_alert"            
+          command: ['/bin/bash', '/service/threshold/src/start.sh']
+
+
