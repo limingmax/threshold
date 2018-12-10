@@ -13,12 +13,12 @@ ENV HBASE_IP HBASE_IP
 ENV HBASE_PORT HBASE_PORT
 
 COPY threshold /service/threshold
-ADD start.sh /service/predict/src
-RUN chmod -R 777 /service/predict/src/start.sh
+ADD start.sh /service/threshold/src
+RUN chmod -R 777 /service/threshold/src/start.sh
 
 WORKDIR /service/threshold/src
 RUN pip install -r /service/threshold/src/requirements.txt
 
-CMD ["/service/predict/src/start.sh"]
+CMD ["/service/threshold/src/start.sh"]
 #防docker容器自动退出
 ENTRYPOINT tail -f /dev/null
