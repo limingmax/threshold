@@ -14,16 +14,16 @@ spec:
     spec:
       containers:
         - name: threshold
-          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v7 
+          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v3
           env:
           - name: REDIS_IP
             value: "192.168.195.1"
           - name: REDIS_PORT
-            value: "30088"
+            value: "30098"
           - name: KAFKA_IP
-            value: "192.168.195.1"
+            value: "192.168.212.71"
           - name: KAFKA_PORT
-            value: "32400"   
+            value: "9092"   
           - name: HBASE_IP
             value: "192.168.195.1"
           - name: HBASE_PORT
