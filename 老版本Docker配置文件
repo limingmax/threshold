@@ -1,6 +1,4 @@
-FROM registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v3
-
-ENV LANG C.UTF-8
+FROM bitnami/python:3.6.7
 
 ENV REDIS_IP REDIS_IP
 ENV REDIS_PORT REDIS_PORT
@@ -14,7 +12,12 @@ ENV PRODUCER_TOPIC PRODUCER_TOPIC
 ENV HBASE_IP HBASE_IP
 ENV HBASE_PORT HBASE_PORT
 
+COPY threshold /service/threshold
+ADD start.sh /service/threshold/src
+RUN chmod -R 777 /service/threshold/src/start.sh
+
 WORKDIR /service/threshold/src
+RUN pip install -r /service/threshold/src/requirements.txt
 
 CMD ["/service/threshold/src/start.sh"]
 #防docker容器自动退出

@@ -14,7 +14,7 @@ class MyClass(threading.Thread):
 
     def __init__(self):
         threading.Thread.__init__(self)
-        #print("=====开始初始化=====")
+        print("=====开始初始化=====")
         self.data =data
         cf = configparser.ConfigParser()
         cf.read("python.ini")
@@ -49,7 +49,7 @@ class MyClass(threading.Thread):
             session_timeout_ms=6000,
             heartbeat_interval_ms=2000
         )
-        #print("====初始化完成====")
+        print("====初始化完成====")
     def month_handle(self,year,month):
         year=int(year)
         month=int(month)
@@ -280,7 +280,7 @@ class MyClass(threading.Thread):
         # 消费topic1的topic，并指定group_id(自定义)，多个机器或进程想顺序消费，可以指定同一个group_id，
         # 如果想一条消费多次消费，可以换一个group_id,会从头开始消费
         consumer = self.consumer
-        #print("=======开始消费==========")
+        print("=======开始消费==========")
         for message in consumer:
             # json读取kafka的消息
             # print(message.value)
