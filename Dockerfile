@@ -1,4 +1,4 @@
-FROM registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v3
+FROM registry.cn-hangzhou.aliyuncs.com/limingmax-test/ai-base:v1
 
 ENV LANG C.UTF-8
 
@@ -13,6 +13,10 @@ ENV PRODUCER_TOPIC PRODUCER_TOPIC
 
 ENV HBASE_IP HBASE_IP
 ENV HBASE_PORT HBASE_PORT
+
+COPY threshold /service/threshold
+ADD start.sh /service/threshold/src
+RUN chmod -R 777 /service/threshold/src/start.sh
 
 WORKDIR /service/threshold/src
 
