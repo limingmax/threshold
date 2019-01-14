@@ -14,6 +14,9 @@ ENV PRODUCER_TOPIC PRODUCER_TOPIC
 ENV HBASE_IP HBASE_IP
 ENV HBASE_PORT HBASE_PORT
 
+ADD hbase.keytab /etc
+ADD krb5.conf /etc
+
 COPY threshold /service/threshold
 ADD start.sh /service/threshold/src
 RUN chmod -R 777 /service/threshold/src/start.sh
