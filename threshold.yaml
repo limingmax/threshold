@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: threshold
-          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v3
+          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v2
           env:
           - name: REDIS_IP
             value: "192.168.195.1"

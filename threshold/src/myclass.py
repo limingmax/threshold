@@ -1,20 +1,32 @@
+# -*- coding: UTF-8 -*-
+
 # from zutils.zrpc.server.threadpool_server import ThreadpoolServer, AbstractServer
 # from zutils.logger import Logger
 import time
 import datetime
 import math
-import happybase
+#import happybase
 import numpy as np
 import json
 from kafka import *
 import configparser
 import threading
+from zutils.logger import Logger
+import os
+from thrift.transport import TSocket
+from thrift.protocol import TBinaryProtocol
+from thrift.transport import TTransport
+from hbase_thrift.hbase import Hbase
+from hbase_thrift.hbase.ttypes import *
+#import logging
+#logging.basicConfig(level=logging.DEBUG)
 data={}
 class MyClass(threading.Thread):
 
     def __init__(self):
+        self.logger = Logger(Logger.INFO, 'myclass', True)
         threading.Thread.__init__(self)
-        print("=====开始初始化=====")
+        self.logger().info("=====开始初始化=====")
         self.data =data
         cf = configparser.ConfigParser()
         cf.read("python.ini")
@@ -24,13 +36,17 @@ class MyClass(threading.Thread):
         self.hbase_port = cf.getint("hbase", "port")
         self.consumer_topic=cf.get("kafka","consumer_topic")
         self.producer_topic=cf.get("kafka","producer_topic")
-        # self.kafka_host = '192.168.212.71'  # kafka服务器地址
+#	print self.consumer_topic
+#	print self.producer_topic
+        print self.kafka_port
+	print self.kafka_host
+	# self.kafka_host = '192.168.212.71'  # kafka服务器地址
         # self.kafka_port = 9092  # kafka服务器端口
         # self.hbase_host='192.168.195.1'
         # self.hbase_port=9090
-        print(self.kafka_host, self.kafka_port, self.hbase_host, self.hbase_port,self.consumer_topic,self.producer_topic)
+        # print(self.kafka_host, self.kafka_port, self.hbase_host, self.hbase_port,self.consumer_topic,self.producer_topic)
 
-        self.connection=happybase.Connection(self.hbase_host, self.hbase_port)
+       # self.connection=happybase.Connection(self.hbase_host, self.hbase_port)
         self.producer=KafkaProducer(bootstrap_servers=['{kafka_host}:{kafka_port}'.format(
             kafka_host=self.kafka_host,
             kafka_port=self.kafka_port
@@ -49,7 +65,7 @@ class MyClass(threading.Thread):
             session_timeout_ms=6000,
             heartbeat_interval_ms=2000
         )
-        print("====初始化完成====")
+        self.logger().info("====初始化完成====")
     def month_handle(self,year,month):
         year=int(year)
         month=int(month)
@@ -68,101 +84,59 @@ class MyClass(threading.Thread):
         self.consumer_metric()
 
     def select(self,metric, resource, namespace,year1,month1,day1, hour,pretime):
-        # connection = self.connection
-        connection = happybase.Connection(self.hbase_host, self.hbase_port)
-        t = connection.table('Monitor_record')
-        return_list = []
+        os.system('kinit -kt /etc/hbase.keytab hbase')
+	sock = TSocket.TSocket("k8s-alpha-master", 9090)
+	transport = TTransport.TSaslClientTransport(sock, "k8s-alpha-master", "hbase")
+	# Use the Binary protocol (must match your Thrift server's expected protocol)
+	protocol = TBinaryProtocol.TBinaryProtocol(transport)
+
+	client = Hbase.Client(protocol)
+	transport.open()
+	table='Monitor_record'
+	
+	return_list = []
         result_list = []
-        # TODO 这里pretime要处理一下大概
         pretime=int(pretime)
-        if namespace:
+	if namespace:
             for i in range(pretime):
                 year, month, day = self.time_handle(year1, month1, day1, i+1)
                 resultlist = []
-                # print("yaer", year)
-                # print("month", month)
-                # print("day", day)
-                # print("hour", hour)
-                # print(resource)
-                # print(metric)
-                filter1 = bytes(
-                    "SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:pod')AND SingleColumnValueFilter ('Metric', 'namespace_name', =, 'binary:{namespace}')".format(
-                        resource=resource, namespace=namespace, metric=metric, year=year, month=month, hour=hour),
-                    encoding='utf-8')
-                result = t.scan(filter=filter1, row_prefix=bytes(
-                    '{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour), encoding='utf-8'))
-                for k, v in result:
-                    # print(k, v)
-                    resultlist.append(float(v[b'Metric:index_value'].decode()))
+		pre='{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour)
+
+                filter1 = "RowFilter(=, 'substring:{pre}')AND SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:pod')AND SingleColumnValueFilter ('Metric', 'namespace_name', =, 'binary:{namespace}')".format(
+                        resource=resource, namespace=namespace, metric=metric, year=year, month=month, hour=hour,pre=pre)
+                tscan=TScan(
+				filterString=filter1
+				)    
+                sid=client.scannerOpenWithScan(table,tscan,{})
+		result=client.scannerGet(sid)
+		while result:
+			print result
+			resultlist.append(float(result[0].columns.get("Metric:index_value").value))
+			result=client.scannerGet(sid)
+
+                
                 result_list.append(resultlist)
         else:
             for i in range(pretime):
-                year, month, day = self.time_handle(year1, month1, day1, i)
+                year, month, day = self.time_handle(year1, month1, day1, i+1)
                 resultlist = []
-                # print("yaer",year)
-                # print("month",month)
-                # print("day",day)
-                # print("hour",hour)
-                # print(resource)
-                # print(metric)
-                filter1 = bytes(
-                    "SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'time', =, 'regexstring:{year}-{month}-.*T{hour}:.*:.*') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:node')".format(
-                        resource=resource, metric=metric, year=year, month=month, hour=hour), encoding='utf-8')
-                result = t.scan(filter=filter1, row_prefix=bytes(
-                    '{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour), encoding='utf-8'))
-                for k, v in result:
-                    # print(k, v)
-                    resultlist.append(float(v[b'Metric:index_value'].decode()))
+		pre='{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour)
+
+                filter1 = "RowFilter(=, 'substring:{pre}')AND SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'time', =, 'regexstring:{year}-{month}-.*T{hour}:.*:.*') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:node')".format(
+                        resource=resource, metric=metric, year=year, month=month, hour=hour,pre=pre)
+                tscan=TScan(
+				filterString=filter1
+				)    
+                sid=client.scannerOpenWithScan(table,tscan,{})
+		result=client.scannerGet(sid)
+		while result:
+			print result
+			resultlist.append(float(result[0].columns.get("Metric:index_value").value))
+			result=client.scannerGet(sid)
                 result_list.append(resultlist)
         for i in range(pretime):
-            # print(result_list[i])
             return_list = return_list + result_list[i]
-        # t = connection.table('Monitor_record')
-        # return_list = []
-        # result_list = []
-        #
-        # if namespace:
-        #     for i in range(pretime):
-        #         year, month, day = self.time_handle(year, month, day, 1)
-        #         resultlist = []
-        #         print("yaer",year)
-        #         print("month",month)
-        #         print("day",day)
-        #         print("hour",hour)
-        #         print(resource)
-        #         print(metric)
-        #         print(pretime)
-        #         filter1 = bytes(
-        #             "SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:pod')AND SingleColumnValueFilter ('Metric', 'namespace_name', =, 'binary:{namespace}')".format(
-        #                 resource=resource,namespace=namespace, metric=metric, year=year, month=month, hour=hour), encoding='utf-8')
-        #         result = t.scan(filter=filter1, row_prefix=bytes(
-        #             '{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour), encoding='utf-8'))
-        #         for k, v in result:
-        #             print(k, v)
-        #             resultlist.append(float(v[b'Metric:index_value'].decode()))
-        #         result_list.append(resultlist)
-        # else:
-        #     for i in range(pretime):
-        #         year, month, day = self.time_handle(year, month, day, 1)
-        #         resultlist = []
-        #         print("year",year)
-        #         print("month",month)
-        #         print("day",day)
-        #         print("hour",hour)
-        #         print(resource)
-        #         print(metric)
-        #         filter1 = bytes(
-        #             "SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'time', =, 'regexstring:{year}-{month}-.*T{hour}:.*:.*') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:node')".format(
-        #                 resource=resource, metric=metric, year=year, month=month, hour=hour), encoding='utf-8')
-        #         result = t.scan(filter=filter1, row_prefix=bytes(
-        #             '{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour), encoding='utf-8'))
-        #         for k, v in result:
-        #             print(k, v)
-        #             resultlist.append(float(v[b'Metric:index_value'].decode()))
-        #         result_list.append(resultlist)
-        # for i in range(pretime):
-        #     # print(result_list[i])
-        #     return_list = return_list + result_list[i]
 
 
 
@@ -195,7 +169,7 @@ class MyClass(threading.Thread):
         if (month >= 10):
             month = str(month)
         else:
-            month = '0' + month
+            month = '0' + str(month)
         if (day >= 10):
             day = str(day)
         else:
@@ -264,10 +238,6 @@ class MyClass(threading.Thread):
         else :
             return False
     def exist_judge(self,time1):
-        # year1,month1,day1,hour1=self.time_handle_now(time1)
-        # year1,month1,day1,hour1=self.time_transfor(year1,month1,day1,hour1)
-        # t1=datetime.datetime.now()
-        # t2=datetime.datetime(int(year1),int(month1),int(day1),int(hour1))
         t1=time1
         t2=time.time()
         t1=datetime.datetime.fromtimestamp(t1)
@@ -280,32 +250,12 @@ class MyClass(threading.Thread):
         # 消费topic1的topic，并指定group_id(自定义)，多个机器或进程想顺序消费，可以指定同一个group_id，
         # 如果想一条消费多次消费，可以换一个group_id,会从头开始消费
         consumer = self.consumer
-        print("=======开始消费==========")
+        self.logger().info("=======开始消费==========")
         for message in consumer:
             # json读取kafka的消息
             # print(message.value)
             content = json.loads(message.value)
-            # print(content)
-            # print(type(content))
-            # content=message.value.decode()
-            # print(content)
-            # print(type(content))
-            # content = eval(content)
-            # print(type(content))
-            # print(content)
-            # for i in content:
-            #     print(i)
-            #     print(i["deviceName"])
-            #     print(i["time"])
-            #     print(i["metric"])
-            #     print(type(i["metric"]))
-            #     print(i["value"])
-            #     print(i["range"])
-            #     print(i["result"])
             for i in content:
-                    # print(content)
-                    # print(i)
-                    # print(type(i))
                     #非空判断
                     # 这里注意要字符串转float
                     #还得注意是否存在这个属性
@@ -323,7 +273,7 @@ class MyClass(threading.Thread):
                     cpu_flag=True
                     memory_flag=True
                     if name in self.data.keys():
-                        print(name)
+                        # print(name)
                         # 2018-10-06T06:10:11Z
                         year, month, day, hour = self.time_handle_now(timeinfo)
                         #同一天false，不同天true
@@ -340,7 +290,8 @@ class MyClass(threading.Thread):
                                     namespace = 0
                                     if len(names) == 4:
                                         namespace = names[-2]
-                                    print(names, namespace, year, month, day, hour, self.data, self.data[name])
+                                    # print(names, namespace, year, month, day, hour, self.data, self.data[name])
+                                    self.logger().info("metric:{metric} resourceName:{resourceName} namespace: {namespace} year:{year} month:{month} day:{day} hour:{hour}")
                                     memory_usage_list = self.select("memory/usage", name.split("_")[-1], namespace,
                                                                     year, month, day, hour,
                                                                     self.data[name]["memory/usage"]["sampleDataTimeRange"])
@@ -366,7 +317,7 @@ class MyClass(threading.Thread):
                                     namespace = 0
                                     if len(names) == 4:
                                         namespace = names[-2]
-                                    print(names, namespace, year, month, day, hour, self.data, self.data[name])
+                                    # print(names, namespace, year, month, day, hour, self.data, self.data[name])
                                     cpu_usage_rate_list = self.select("cpu/usage_rate", name.split("_")[-1], namespace,
                                                                       year,
                                                                       month, day, hour,
@@ -455,6 +406,7 @@ class MyClass(threading.Thread):
         message["ruleId"]=ruleId
         #这里在初始化里已经json化了
         # message = json.dumps(message)
+        self.logger().info(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))+" kafka_host:"+str(self.kafka_host)+" kafka_port:"+str(self.kafka_port)+" metric:"+message["metric"]+" time:"+message["time"]+" value:"+metric["value"]+" low:"+str(low)+" hign:"+str(hign)+" ruleId:"+ruleId)
         self.send(message)
 
     def NDtest(self,value_list):
