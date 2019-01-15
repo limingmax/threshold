@@ -85,8 +85,8 @@ class MyClass(threading.Thread):
 
     def select(self,metric, resource, namespace,year1,month1,day1, hour,pretime):
         os.system('kinit -kt /etc/hbase.keytab hbase')
-	sock = TSocket.TSocket(hbase_host, hbase_port)
-	transport = TTransport.TSaslClientTransport(sock, hbase_host, "hbase")
+	sock = TSocket.TSocket(self.hbase_host, self.hbase_port)
+	transport = TTransport.TSaslClientTransport(sock, self.hbase_host, "hbase")
 	# Use the Binary protocol (must match your Thrift server's expected protocol)
 	protocol = TBinaryProtocol.TBinaryProtocol(transport)
 
