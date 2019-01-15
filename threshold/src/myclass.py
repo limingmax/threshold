@@ -291,7 +291,7 @@ class MyClass(threading.Thread):
                                     if len(names) == 4:
                                         namespace = names[-2]
                                     # print(names, namespace, year, month, day, hour, self.data, self.data[name])
-                                    self.logger().info("metric:{metric} resourceName:{resourceName} namespace: {namespace} year:{year} month:{month} day:{day} hour:{hour}")
+                                    self.logger().info("metric:{metric} resourceName:{resourceName} namespace: {namespace} year:{year} month:{month} day:{day} hour:{hour}".format(metric=metric,resourceName=name.split("_")[-1],namespace=namespace,year=year,month=month,day=day,hour=hour))
                                     memory_usage_list = self.select("memory/usage", name.split("_")[-1], namespace,
                                                                     year, month, day, hour,
                                                                     self.data[name]["memory/usage"]["sampleDataTimeRange"])
@@ -406,7 +406,7 @@ class MyClass(threading.Thread):
         message["ruleId"]=ruleId
         #这里在初始化里已经json化了
         # message = json.dumps(message)
-        self.logger().info(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))+" kafka_host:"+str(self.kafka_host)+" kafka_port:"+str(self.kafka_port)+" metric:"+message["metric"]+" time:"+message["time"]+" value:"+metric["value"]+" low:"+str(low)+" hign:"+str(hign)+" ruleId:"+ruleId)
+        self.logger().info(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))+" kafka_host:"+str(self.kafka_host)+" kafka_port:"+str(self.kafka_port)+" metric:"+message["metric"]+" time:"+message["time"]+" value:"+message["value"]+" low:"+str(low)+" hign:"+str(hign)+" ruleId:"+ruleId)
         self.send(message)
 
     def NDtest(self,value_list):
