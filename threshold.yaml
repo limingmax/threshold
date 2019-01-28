@@ -31,7 +31,17 @@ spec:
           - name: CONSUMER_TOPIC
             value: "k8s_MonitorData" 
           - name: PRODUCER_TOPIC
-            value: "ai_threshold_alert"            
+            value: "ai_threshold_alert"  
+          - name: MYSQL_IP
+            value: "192.168.193.1"
+          - name: MYSQL_PORT
+            value: "30001"
+          - name: MYSQL_USER
+            value: "root"
+          - name: MYSQL_PASSWD
+            value: "123"
+          - name: MYSQL_DB
+            value: "notifies"            
           command: ['/bin/bash', '/service/threshold/src/start.sh']
 
 

@@ -15,6 +15,11 @@ import configparser
 import threading
 from myclass import MyClass
 from myclass import data
+import schedule
+from mysqldemo import Polling
+
+
+
 #阈值告警
 # 创建服务，单例，如果资源有竞争，创建放在func里
 #
@@ -96,6 +101,17 @@ t.start()
 cf = configparser.ConfigParser()
 cf.read("python.ini")
 redis_server = cf.get("register", "address")
+
+host =cf.get("mysql", "host").encode()
+port = int(cf.get("mysql", "port"))
+user = cf.get("mysql", "user").encode()
+passwd =cf.get("mysql", "passwd").encode()
+db = cf.get("mysql", "db").encode()
+charset = cf.get("mysql", "charset").encode()
+minute =int(cf.get("mysql", "minute"))
+Polling(data,minute,host,port,user,passwd,db,charset).run()
+
+
 logger = Logger(Logger.INFO, 'example', True)
 # 参数：日志级别   日志文件名   日志是否控制台输出
 

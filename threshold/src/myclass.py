@@ -57,7 +57,8 @@ class MyClass(threading.Thread):
             # 'k8s_MonitorData',
             self.consumer_topic,
             # 'ai_threshold_alert',
-            group_id='mygroup11',
+            group_id='mygroup1',
+            enable_auto_commit=False,
             # auto_offset_reset='earliest',
             bootstrap_servers=['{kafka_host}:{kafka_port}'.format(kafka_host=self.kafka_host, kafka_port=self.kafka_port)],
             # 一定要设置下列两个参数。官网里有参数的解释https://kafka-python.readthed...
@@ -85,35 +86,31 @@ class MyClass(threading.Thread):
 
     def select(self,metric, resource, namespace,year1,month1,day1, hour,pretime):
         os.system('kinit -kt /etc/hbase.keytab hbase')
-	sock = TSocket.TSocket(self.hbase_host, self.hbase_port)
-	transport = TTransport.TSaslClientTransport(sock, self.hbase_host, "hbase")
-	# Use the Binary protocol (must match your Thrift server's expected protocol)
-	protocol = TBinaryProtocol.TBinaryProtocol(transport)
+        sock = TSocket.TSocket(self.hbase_host, self.hbase_port)
+        transport = TTransport.TSaslClientTransport(sock, self.hbase_host, "hbase")
+		# Use the Binary protocol (must match your Thrift server's expected protocol)
+        protocol = TBinaryProtocol.TBinaryProtocol(transport)
 
-	client = Hbase.Client(protocol)
-	transport.open()
-	table='Monitor_record'
-	
-	return_list = []
+        client = Hbase.Client(protocol)
+        transport.open()
+        table='Monitor_record'
+		
+        return_list = []
         result_list = []
         pretime=int(pretime)
-	if namespace:
+        if namespace:
             for i in range(pretime):
                 year, month, day = self.time_handle(year1, month1, day1, i+1)
                 resultlist = []
-		pre='{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour)
-
-                filter1 = "RowFilter(=, 'substring:{pre}')AND SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:pod')AND SingleColumnValueFilter ('Metric', 'namespace_name', =, 'binary:{namespace}')".format(
-                        resource=resource, namespace=namespace, metric=metric, year=year, month=month, hour=hour,pre=pre)
-                tscan=TScan(
-				filterString=filter1
-				)    
+                pre=metric+"_"+resource+"_"+namespace+"_"+year+"-"+month+"-"+day+"T"+hour
+                filter1 = "RowFilter(=, 'binaryprefix:{pre}')".format(pre=pre)
+                tscan=TScan(filterString=filter1)    
                 sid=client.scannerOpenWithScan(table,tscan,{})
-		result=client.scannerGet(sid)
-		while result:
-			print result
-			resultlist.append(float(result[0].columns.get("Metric:index_value").value))
-			result=client.scannerGet(sid)
+                result=client.scannerGet(sid)
+                while result:
+                    print result
+                    resultlist.append(float(result[0].columns.get("Metric:index_value").value))
+                    result=client.scannerGet(sid)
 
                 
                 result_list.append(resultlist)
@@ -121,25 +118,21 @@ class MyClass(threading.Thread):
             for i in range(pretime):
                 year, month, day = self.time_handle(year1, month1, day1, i+1)
                 resultlist = []
-		pre='{year}-{month}-{day}T{hour}'.format(year=year, month=month, day=day, hour=hour)
+                pre=metric+"_"+resource+"_"+year+"-"+month+"-"+day+"T"+hour
 
-                filter1 = "RowFilter(=, 'substring:{pre}')AND SingleColumnValueFilter ('Metric', 'resourceName', =, 'binary:{resource}') AND SingleColumnValueFilter ('Metric', 'index_name', =, 'binary:{metric}') AND SingleColumnValueFilter ('Metric', 'time', =, 'regexstring:{year}-{month}-.*T{hour}:.*:.*') AND SingleColumnValueFilter ('Metric', 'type', =, 'binary:node')".format(
-                        resource=resource, metric=metric, year=year, month=month, hour=hour,pre=pre)
-                tscan=TScan(
-				filterString=filter1
-				)    
+                filter1 = "RowFilter(=, 'binaryprefix:{pre}')".format(pre=pre)
+                tscan=TScan(filterString=filter1)    
                 sid=client.scannerOpenWithScan(table,tscan,{})
-		result=client.scannerGet(sid)
-		while result:
-			print result
-			resultlist.append(float(result[0].columns.get("Metric:index_value").value))
-			result=client.scannerGet(sid)
-                result_list.append(resultlist)
-        for i in range(pretime):
+                result=client.scannerGet(sid)
+                while result:
+                    print result
+                    resultlist.append(float(result[0].columns.get("Metric:index_value").value))
+                    result=client.scannerGet(sid)
+                    result_list.append(resultlist)
+        for i in range(len(result_list)):
             return_list = return_list + result_list[i]
-
-
-
+        
+        print return_list
         return return_list
 
 
@@ -230,9 +223,10 @@ class MyClass(threading.Thread):
         hour1=int(hour1)
         hour2=int(hour2)
         #False未过期 True过期了
-        t1 = datetime.datetime(year1, month1, day1, hour1)
-        t2 = datetime.datetime(year2, month2, day2, hour2)
-        if((t1-t2).days>=1):
+	if hour1!=hour2:
+        #t1 = datetime.datetime(year1, month1, day1, hour1)
+        #t2 = datetime.datetime(year2, month2, day2, hour2)
+        #if((t1-t2).days>=1):
 
             return True
         else :
@@ -259,12 +253,18 @@ class MyClass(threading.Thread):
                     #非空判断
                     # 这里注意要字符串转float
                     #还得注意是否存在这个属性
-
+                    name=0
                     # TODO 其他指标待添加
                     if 'name'in i.keys():
                         name = i['name']
+                        names=name.split("_")
+                        if len(names)==4:
+                           name=names[-2]+"_"+names[-1]
+                        elif len(names)==2:
+                           name=names[-1]
                     else:
                         continue
+                   
                     timeinfo = i['time']
                     low=0
                     hign=0
@@ -273,7 +273,7 @@ class MyClass(threading.Thread):
                     cpu_flag=True
                     memory_flag=True
                     if name in self.data.keys():
-                        # print(name)
+                        print(name,"~~~~~~~~~~~")
                         # 2018-10-06T06:10:11Z
                         year, month, day, hour = self.time_handle_now(timeinfo)
                         #同一天false，不同天true
@@ -288,13 +288,15 @@ class MyClass(threading.Thread):
                                     self.data[name]["memory/usage"]["timeout"] = timeinfo
                                     names = name.split("_")
                                     namespace = 0
-                                    if len(names) == 4:
+                                    if len(names) == 2:
                                         namespace = names[-2]
+                                        
                                     # print(names, namespace, year, month, day, hour, self.data, self.data[name])
                                     self.logger().info("metric:{metric} resourceName:{resourceName} namespace: {namespace} year:{year} month:{month} day:{day} hour:{hour}".format(metric=metric,resourceName=name.split("_")[-1],namespace=namespace,year=year,month=month,day=day,hour=hour))
                                     memory_usage_list = self.select("memory/usage", name.split("_")[-1], namespace,
                                                                     year, month, day, hour,
                                                                     self.data[name]["memory/usage"]["sampleDataTimeRange"])
+                                    print memory_usage_list,"select"
                                     hign = 0
                                     low = 0
                                     if memory_usage_list:
@@ -315,7 +317,7 @@ class MyClass(threading.Thread):
                                     self.data[name]["cpu/usage_rate"]["timeout"] = timeinfo
                                     names = name.split("_")
                                     namespace = 0
-                                    if len(names) == 4:
+                                    if len(names) == 2:
                                         namespace = names[-2]
                                     # print(names, namespace, year, month, day, hour, self.data, self.data[name])
                                     cpu_usage_rate_list = self.select("cpu/usage_rate", name.split("_")[-1], namespace,
@@ -342,11 +344,13 @@ class MyClass(threading.Thread):
                 for metric in data[name].keys():
                     if metric=="cpu/usage_rate":
                         if self.exist_judge(data[name]["cpu/usage_rate"]["latestTime"]):
+                            data[name]["cpu/usage_rate"]["latestTime"]=time.time()
                             self.decide(name, "cpu/usage_rate", 0, 0,
                                         0, self.data[name]["cpu/usage_rate"]["ruleId"],"")
 
                     if metric=="memory/usage":
                         if self.exist_judge(data[name]["memory/usage"]["latestTime"]):
+                            data[name]["memory/usage"]["latestTime"]=time.time()
                             self.decide(name, "memory/usage", 0, 0,
                                         0, self.data[name]["memory/usage"]["ruleId"],"")
     def time_out(self,time1,time2):
