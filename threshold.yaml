@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: threshold
+  namespace: ai
 spec:
   replicas: 1
   selector:
@@ -12,18 +13,28 @@ spec:
       labels:
         name: threshold
     spec:
+      hostAliases:
+      - ip: "192.168.195.1"
+        hostnames:
+        - "k8s-alpha-master"
+      - ip: "192.168.195.2"
+        hostnames:
+        - "k8s-alpha-node1"
+      - ip: "192.168.195.3"
+        hostnames:
+        - "k8s-alpha-node2"
       containers:
         - name: threshold
-          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:v2
+          image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:nocv4
           env:
           - name: REDIS_IP
-            value: "192.168.195.1"
+            value: "192.168.193.1"
           - name: REDIS_PORT
             value: "30098"
           - name: KAFKA_IP
-            value: "192.168.212.71"
+            value: "192.168.195.1"
           - name: KAFKA_PORT
-            value: "9092"   
+            value: "32400"   
           - name: HBASE_IP
             value: "192.168.195.1"
           - name: HBASE_PORT
@@ -31,17 +42,21 @@ spec:
           - name: CONSUMER_TOPIC
             value: "k8s_MonitorData" 
           - name: PRODUCER_TOPIC
-            value: "ai_threshold_alert"  
+            value: "ai_threshold_alert"
           - name: MYSQL_IP
-            value: "192.168.193.1"
+            value: "192.168.195.1"
           - name: MYSQL_PORT
-            value: "30001"
+            value: "32306"
           - name: MYSQL_USER
             value: "root"
           - name: MYSQL_PASSWD
-            value: "123"
+            value: "root123"
           - name: MYSQL_DB
-            value: "notifies"            
+            value: "notifies"
+          - name: REALMS_KDC
+            value: "k8s-alpha-master"
+          - name: REALMS_ADMIN_SERVER
+            value: "k8s-alpha-master"          
           command: ['/bin/bash', '/service/threshold/src/start.sh']
 
 
