@@ -28,7 +28,7 @@ spec:
           image: registry.cn-hangzhou.aliyuncs.com/limingmax-test/threshold:nocv4
           env:
           - name: REDIS_IP
-            value: "192.168.193.1"
+            value: "192.168.195.1"
           - name: REDIS_PORT
             value: "30098"
           - name: KAFKA_IP
